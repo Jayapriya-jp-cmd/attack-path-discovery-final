@@ -1,0 +1,84 @@
+{
+  "version": "1.0.0",
+  "description": "Simulated BloodHound Active Directory dataset for attack path analysis",
+  "domain": {
+    "name": "CORP.LOCAL",
+    "dc": "DC01.CORP.LOCAL",
+    "functional_level": "Windows Server 2016"
+  },
+  "users": [
+    { "id": "U-001", "name": "Administrator", "type": "User", "enabled": true, "adminCount": true, "passwordLastSet": "2024-01-15", "lastLogon": "2024-03-10", "memberOf": ["G-001", "G-002"] },
+    { "id": "U-002", "name": "john.doe", "type": "User", "enabled": true, "adminCount": false, "passwordLastSet": "2023-06-01", "lastLogon": "2024-03-11", "memberOf": ["G-003", "G-004"], "kerberoastable": false, "asreproastable": false },
+    { "id": "U-003", "name": "svc_backup", "type": "User", "enabled": true, "adminCount": false, "passwordLastSet": "2021-03-15", "lastLogon": "2024-03-11", "memberOf": ["G-005"], "kerberoastable": true, "spn": "backup/DC01.CORP.LOCAL" },
+    { "id": "U-004", "name": "svc_sql", "type": "User", "enabled": true, "adminCount": false, "passwordLastSet": "2020-11-20", "lastLogon": "2024-03-09", "memberOf": ["G-006"], "kerberoastable": true, "spn": "MSSQLSvc/SQL01.CORP.LOCAL:1433" },
+    { "id": "U-005", "name": "jane.smith", "type": "User", "enabled": true, "adminCount": false, "passwordLastSet": "2024-02-01", "lastLogon": "2024-03-11", "memberOf": ["G-003", "G-007"], "asreproastable": false },
+    { "id": "U-006", "name": "helpdesk.user", "type": "User", "enabled": true, "adminCount": false, "passwordLastSet": "2023-12-01", "lastLogon": "2024-03-08", "memberOf": ["G-008"], "asreproastable": true },
+    { "id": "U-007", "name": "krbtgt", "type": "User", "enabled": false, "adminCount": true, "passwordLastSet": "2020-01-01", "lastLogon": "Never", "memberOf": [] },
+    { "id": "U-008", "name": "dev.admin", "type": "User", "enabled": true, "adminCount": false, "passwordLastSet": "2023-09-10", "lastLogon": "2024-03-10", "memberOf": ["G-003", "G-009"], "kerberoastable": false }
+  ],
+  "groups": [
+    { "id": "G-001", "name": "Domain Admins", "type": "Group", "members": ["U-001"], "adminTo": ["C-001", "C-002", "C-003"] },
+    { "id": "G-002", "name": "Enterprise Admins", "type": "Group", "members": ["U-001"] },
+    { "id": "G-003", "name": "Domain Users", "type": "Group", "members": ["U-002", "U-005", "U-008"] },
+    { "id": "G-004", "name": "Remote Desktop Users", "type": "Group", "members": ["U-002"], "canRDP": ["C-002"] },
+    { "id": "G-005", "name": "Backup Operators", "type": "Group", "members": ["U-003"], "privileges": ["SeBackupPrivilege", "SeRestorePrivilege"] },
+    { "id": "G-006", "name": "SQL Admins", "type": "Group", "members": ["U-004"], "adminTo": ["C-003"] },
+    { "id": "G-007", "name": "IT Staff", "type": "Group", "members": ["U-005"], "canRDP": ["C-001", "C-002"] },
+    { "id": "G-008", "name": "Helpdesk", "type": "Group", "members": ["U-006"], "canResetPassword": ["G-003"] },
+    { "id": "G-009", "name": "Developers", "type": "Group", "members": ["U-008"], "canRDP": ["C-004"] }
+  ],
+  "computers": [
+    { "id": "C-001", "name": "DC01.CORP.LOCAL", "type": "Computer", "os": "Windows Server 2016", "role": "Domain Controller", "enabled": true, "adminUsers": ["U-001"] },
+    { "id": "C-002", "name": "WORKSTATION01.CORP.LOCAL", "type": "Computer", "os": "Windows 10", "role": "Workstation", "enabled": true, "localAdmins": ["U-002"], "sessions": ["U-002", "U-005"] },
+    { "id": "C-003", "name": "SQL01.CORP.LOCAL", "type": "Computer", "os": "Windows Server 2019", "role": "SQL Server", "enabled": true, "localAdmins": ["U-004"], "sessions": ["U-004"] },
+    { "id": "C-004", "name": "DEV01.CORP.LOCAL", "type": "Computer", "os": "Windows 10", "role": "Dev Workstation", "enabled": true, "localAdmins": ["U-008"], "sessions": ["U-008", "U-002"] }
+  ],
+  "attack_paths": [
+    {
+      "id": "AD-PATH-001",
+      "name": "Kerberoasting → Password Crack → Domain Admin",
+      "severity": "CRITICAL",
+      "steps": [
+        { "node": "U-006", "action": "AS-REP Roasting", "description": "U-006 has Pre-Auth disabled. Request AS-REP hash without credentials." },
+        { "node": "U-006", "action": "Offline Hash Crack", "description": "Crack AS-REP hash offline. Account has old password (set 2023)." },
+        { "node": "G-008", "action": "Helpdesk Compromise", "description": "helpdesk.user has ability to reset passwords for Domain Users group." },
+        { "node": "U-002", "action": "Password Reset", "description": "Reset john.doe password via helpdesk privileges." },
+        { "node": "C-002", "action": "Admin Access", "description": "john.doe is local admin on WORKSTATION01. PSExec/WMI access." },
+        { "node": "U-005", "action": "Credential Harvest", "description": "jane.smith has active session on WORKSTATION01. Dump LSASS." },
+        { "node": "G-007", "action": "Lateral Movement", "description": "IT Staff group (jane.smith) can RDP to DC01." },
+        { "node": "C-001", "action": "Domain Controller Access", "description": "RDP into DC01 as jane.smith. Run Mimikatz dcsync." },
+        { "node": "G-001", "action": "Domain Admin", "description": "DCSync extracts Administrator NTLM hash. Domain fully compromised." }
+      ]
+    },
+    {
+      "id": "AD-PATH-002",
+      "name": "Kerberoasting → SQL Admin → Lateral Movement",
+      "severity": "HIGH",
+      "steps": [
+        { "node": "U-004", "action": "Kerberoasting", "description": "svc_sql has SPN registered. Request TGS ticket without admin rights." },
+        { "node": "U-004", "action": "Offline Hash Crack", "description": "Crack TGS hash (password set 2020 — weak/dictionary likely)." },
+        { "node": "C-003", "action": "SQL Server Admin", "description": "svc_sql has admin rights on SQL01. Enable xp_cmdshell for RCE." },
+        { "node": "U-003", "action": "Credential Harvest", "description": "svc_backup session found on SQL01. LSASS dump." },
+        { "node": "G-005", "action": "Backup Operator Abuse", "description": "SeBackupPrivilege allows reading NTDS.dit via shadow copy." },
+        { "node": "G-001", "action": "Domain Admin", "description": "Offline crack NTDS.dit → extract all domain hashes including Administrator." }
+      ]
+    },
+    {
+      "id": "AD-PATH-003",
+      "name": "Zerologon → Domain Controller → Full Takeover",
+      "severity": "CRITICAL",
+      "steps": [
+        { "node": "C-001", "action": "Zerologon", "description": "CVE-2020-1472: Reset DC machine account password to empty string." },
+        { "node": "C-001", "action": "DCSync", "description": "Use machine account to perform DCSync, extract all hashes." },
+        { "node": "U-001", "action": "Pass-the-Hash", "description": "Use Administrator NTLM hash for PtH authentication." },
+        { "node": "G-001", "action": "Domain Admin", "description": "Full domain compromise achieved in single step." }
+      ]
+    }
+  ],
+  "acls": [
+    { "from": "G-008", "to": "G-003", "right": "GenericWrite", "description": "Helpdesk can reset passwords of Domain Users" },
+    { "from": "U-002", "to": "C-002", "right": "AdminTo", "description": "john.doe is local admin on WORKSTATION01" },
+    { "from": "G-007", "to": "C-001", "right": "CanRDP", "description": "IT Staff can RDP to Domain Controller" },
+    { "from": "G-005", "to": "C-001", "right": "CanPSRemote", "description": "Backup Operators can PSRemote to DC" }
+  ]
+}

